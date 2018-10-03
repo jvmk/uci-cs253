@@ -11,9 +11,16 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.stream.Stream;
 
+
+// NOTE - Professor's ruleset used for splitting:
+// 1 normalize to lowercase
+// 2 replace all non-alphanumeric characters by a space
+// 3 split by space
+// 4 drop all 1-character words
+
 /**
  * Solution for week 1 programming assignment of UCI CS253 (Fall 2018).
- * 
+ *
  * @author Janus Varmarken {@literal <jvarmark@uci.edu>}
  */
 public class TermFreqWeek01 {
@@ -40,19 +47,17 @@ public class TermFreqWeek01 {
         final Map<String, Integer> wordCounts = new HashMap<>();
         // Note: use try-with-resource such that the file is automatically closed.
         try (Stream<String> txtFileLines = Files.lines(Paths.get(txtFilePath))) {
-            // Tokenize each line by splitting at each (variable length) chunk of whitespace.
-            Stream<String[]> wordsLineByLine = txtFileLines.map(line -> line.split("\\s+"));
-            // Flatten, making each element of resulting stream an individual word.
-            Stream<String> words = wordsLineByLine.flatMap(Arrays::stream);
-            // Drop whitespace-only strings and empty strings
-            words = words.filter(w -> !w.matches("\\s+") && !w.equals(""));
-            // Make case insensitve, then drop all non-alphabet characters, including spaces.
-            words = words.map(w -> w.toLowerCase()).map(w -> w.replaceAll("[^a-zA-Z]", ""));
-            // Drop all words in stop_words.txt, then count the number of occurrences by filling the map.
-            // The merge call associates the entry with a value of 1 if the key is not found; otherwise the current
-            // value is incremented by 1 (as newVal assumes a value of 1).
-            words.filter(w -> !stopWords.contains(w)). // only include words not present in stop_words.txt
-                    forEach(w -> wordCounts.merge(w, 1, (oldVal, newVal) -> oldVal + newVal));
+            // Normalize to lower case and convert all non-alphanumeric characters (except whitespace) to a space.
+            txtFileLines.map(line -> line.toLowerCase().replaceAll("[^a-zA-Z\\d\\s]", " ")).
+                    // Separate into separete words; use flatMap to flatten Stream<String[]> to Stream<String>
+                    map(line -> line.split("\\s+")).flatMap(Arrays::stream).
+                    // Drop all 1-character words and empty strings.
+                    filter(word -> word.length() > 1).
+                    // Drop all words in stop_words.txt, then count the number of occurrences by filling the map.
+                    // The merge call associates the entry with a value of 1 if the key is not found; otherwise the
+                    // current value is incremented by 1 (as newVal assumes a value of 1).
+                    filter(word -> !stopWords.contains(word)).
+                    forEach(word -> wordCounts.merge(word, 1, (oldVal, newVal) -> oldVal + newVal));
         }
         // Sort map entry set by value (number of occurrences of the word that is the key) and print the result.
         // Note that the result of the built-in Integer comparator is negated so as to sort the values in descending order.
