@@ -15,3 +15,8 @@ gradle-app.setting
 
 # Ignore Java class file.
 *.class
+
+# ignore intellij user dependent config files
+.idea/misc.xml
+.idea/vcs.xml
+.idea/workspace.xml
