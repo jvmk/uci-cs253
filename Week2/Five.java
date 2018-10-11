@@ -1,65 +1,163 @@
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 /**
- * TODO add class documentation.
+ * <p>
+ *     Solution for exercise 2 of 2 of week 2 of UCI CS253 (a combination of exercises 5.1 and 5.2 in "Exercises in
+ *     Programming Style" by Professor C. Lopes).
+ * </p>
  *
- * @author Janus Varmarken
+ * In this exercise, we're to obey to a functional programming style in which the program's logic is split across a
+ * predefined set of functions, each of which handle a subproblem of the larger problem. The larger problem is then
+ * solved by function composition. Note that we must avoid maintaining (global) state, and each function should be
+ * idempotent (except the initial and final function which perform I/O and therefore cannot be made idempotent).
+ * Additionally, we must modify the code so that it receives the path to the {@code stop_words.txt} file as the
+ * second command line argument (the first argument is the path to the input file that is being analyzed (e.g.,
+ * the {@code pride-and-prejudice.txt} file)). Finally, all functions must obey the constraint that they can only
+ * take a single argument.
+ *
+ * @author Janus Varmarken {@literal <jvarmark@uci.edu>}
  */
 public class Five {
 
+    public static void main(String[] args) {
+        // Inserted line breaks to make call chain more readable.
+        printAll(
+                sort(
+                    frequencies(
+                        removeStopWords(
+                                scan(
+                                    filterCharsAndNormalize(
+                                        readFile(args[0])
+                                    )
+                                )
+                        ).apply(args[1]) // applying the returned function with the stop words file path.
+                    )
+                ).subList(0, 25)
+        );
+    }
 
-    /* ORIGINAL BODY OF Four.java
-
-    public static void main(String[] args) throws IOException {
-        // Use try-with-resource to make sure that the file handles underlying the Streams are closed at end of block.
-        try(Stream<String> linesStream = readFile(args[0]);
-            Stream<String> stopWordsStream = readFile("../stop_words.txt")) {
-            Stream<String> lines = filterCharsAndNormalize(linesStream);
-            Stream<String> words = scan(lines);
-            words = removeStopWords(words, stopWordsStream);
-            Map<String, Integer> freqs = frequencies(words);
-            Stream<Pair<String, Integer>> sorted = sort(freqs);
-            sorted.limit(25).forEach(p -> System.out.println(String.format("%s  -  %d", p.mItem1, p.mItem2)));
+    /**
+     * Given a filepath, reads the textual content of the file and returns it as a string. Line breaks in the file are
+     * preserved (and translated to the system's line separator) in the output string. Note: if an {@link IOException}
+     * is thrown by the read operation, it will be wrapped in a {@link RuntimeException} that is then rethrown to inform
+     * the caller of this method of the error. This is to allow the caller to invoke this method from within a lambda's
+     * body without being forced to wrap the call in a try-catch block.
+     *
+     * @param filepath The path to the file to read from.
+     * @return The textual content of the file identified by {@code filepath}.
+     */
+    public static String readFile(String filepath) {
+        // Freeing resources: use try-with-resource such that file handles are automatically closed.
+        try(Stream<String> lines = Files.lines(Paths.get(filepath))) {
+            // Join strings using the system's line separator in order to preserve line breaks in the single resulting
+            // string (Files.lines(Path) throws away line separators when reading the file).
+            return lines.collect(Collectors.joining(System.lineSeparator()));
+        } catch (IOException ioe) {
+            // Hide the fact that method is throwing a checked exception by rethrowing it wrapped in an unchecked
+            // exception in order to allow this method to be called from within a lambda's body.
+            throw new RuntimeException(ioe);
         }
     }
 
-    public static Stream<String> readFile(String filePath) throws IOException {
-        return Files.lines(Paths.get(filePath));
-    }
-
-    public static Stream<String> filterCharsAndNormalize(Stream<String> lineStream) {
+    /**
+     * Takes a string and returns a lower case copy where all non-alphanumeric characters have been removed.
+     *
+     * @param data The string that is to be normalized.
+     * @return A lower case copy of {@code data} where all non-alphanumeric characters have been removed.
+     */
+    public static String filterCharsAndNormalize(String data) {
         // Normalize to lower case and convert all non-alphanumeric characters (except whitespace) to a space.
-        return lineStream.map(line -> line.toLowerCase().replaceAll("[^a-zA-Z\\d\\s]", " "));
+        return data.replaceAll("[^a-zA-Z\\d\\s]", " ").toLowerCase();
     }
 
-    public static Stream<String> scan(Stream<String> lineStream) {
+    /**
+     * Given a string, return a list of words in that string.
+     * @param data The string that is to be split into separate words.
+     * @return A list of words in {@code data}.
+     */
+    public static List<String> scan(String data) {
         // Separate into separate words by splitting for each whitespace.
-        // Use flatMap to flatten Stream<String[]> to Stream<String>.
-        // Drop empty strings and one-character "words"
-        return lineStream.map(line -> line.split("\\s+")).flatMap(Arrays::stream).filter(w -> w.length() > 1);
+        return Arrays.asList(data.split("\\s+"));
     }
 
-    public static Stream<String> removeStopWords(Stream<String> wordStream, Stream<String> stopWordsStream) {
-        // Collect stopwords to set. Note: explicitly use HashSet for O(1) complexity contains().
-        Set<String> stopWords = stopWordsStream.map(line -> line.split(",")).flatMap(Arrays::stream).
-                collect(Collectors.toCollection(HashSet::new));
-        // Drop all words in stop_words.txt.
-        return wordStream.filter(word -> !stopWords.contains(word));
+
+    /**
+     * Given a list of words, returns a function that, when invoked with a path to a stop words file, will return a new
+     * list of words based on the input, but with all stop words and one-character words removed.
+     *
+     * @param words A list of words.
+     * @return A function that, when invoked with a path to a stop words file, will return a new list of words based on
+     *         the input, but with all stop words and one-character words removed.
+     */
+    public static Function<String, List<String>> removeStopWords(List<String> words) {
+        // Make use of "Currying": Return a function that takes a path to the stop words file and returns a copy
+        // of the list of words provided as argument to this outer function with all stop words and one-character words
+        // removed.
+        return stopWordsFilepath -> {
+            // Read stop words into a set. Explicitly collect to HashSet to get O(1) contains.
+            Set<String> stopWords = Arrays.stream(readFile(stopWordsFilepath).split(",")).
+                    collect(Collectors.toCollection(HashSet::new));
+            // Return a copy of the input with all stop words and one-character words removed.
+            return words.stream().filter(w -> !stopWords.contains(w) && w.length() > 1).collect(Collectors.toList());
+        };
     }
 
-    public static Map<String, Integer> frequencies(Stream<String> wordStream) {
-        // Count the number of occurrences by filling in a map.
-        Map<String, Integer> wordCounts = new HashMap<>();
-        // Note: the merge call associates the entry with a value of 1 if the key is not found; otherwise the
-        // current value is incremented by 1 (as newVal assumes a value of 1).
-        wordStream.forEach(word -> wordCounts.merge(word, 1, (oldVal, newVal) -> oldVal + newVal));
-        return wordCounts;
+    /**
+     * Given a list of words, constructs a {@link Map} that associates each distinct word with its frequency in the
+     * input list.
+     *
+     * @param words A list of words.
+     * @return A {@link Map} that associates each distinct word with its frequency in the input list.
+     */
+    public static Map<String, Integer> frequencies(List<String> words) {
+        final Map<String, Integer> wordFreqs = new HashMap<>();
+        words.forEach(word -> wordFreqs.merge(word, 1, (oldVal, newVal) -> oldVal + newVal));
+        return wordFreqs;
     }
 
-    public static Stream<Pair<String, Integer>> sort(Map<String, Integer> wordCounts) {
-        return wordCounts.entrySet().stream().sorted((e1, e2) -> -e1.getValue().compareTo(e2.getValue())).
-                map(entry -> new Pair<>(entry.getKey(), entry.getValue()));
+    /**
+     * Given a {@link Map} associating words with their frequencies (as returned by {@link #frequencies(List)}),
+     * constructs a list of corresponding {@code Pair<String, Integer>} instances sorted by word frequency (descending
+     * order).
+     *
+     * @param wordFreqs A {@link Map} associating words with their frequencies.
+     * @return A list of corresponding {@code Pair<String, Integer>} instances sorted by word frequency (descending
+     *         order).
+     */
+    public static List<Pair<String, Integer>> sort(Map<String, Integer> wordFreqs) {
+        return wordFreqs.entrySet().stream().sorted((e1, e2) -> -e1.getValue().compareTo(e2.getValue())).
+                map(entry -> new Pair<>(entry.getKey(), entry.getValue())).collect(Collectors.toList());
     }
 
-    // Basic helper tuple
+    /**
+     * Takes a list of pairs of words and their associated frequencies and prints them recursively. While it'd be more
+     * efficient (and memory friendly) to avoid the recursion here, we do so in order to mirror the example code in the
+     * book.
+     *
+     * @param wordFreqs The word frequencies that are to be printed.
+     */
+    public static void printAll(List<Pair<String, Integer>> wordFreqs) {
+        if (wordFreqs.size() > 0) {
+            Pair<String, Integer> head = wordFreqs.get(0);
+            System.out.println(String.format("%s  -  %d", head.mItem1, head.mItem2));
+            // Proceed to the remainder of the list if there's an element at index 1, otherwise supply the termination
+            // condition argument (the empty list) to the recursive call.
+            printAll(wordFreqs.size() > 1 ? wordFreqs.subList(1, wordFreqs.size()) : new ArrayList<>());
+        }
+    }
+
+    /**
+     * Basic, immutable helper pair/tuple.
+     *
+     * @param <T1> Type of element 1 of the pair.
+     * @param <T2> Type of element 2 of the pair.
+     */
     private static class Pair<T1, T2> {
         private final T1 mItem1;
         private final T2 mItem2;
@@ -69,5 +167,5 @@ public class Five {
         }
     }
 
-    */
+
 }
