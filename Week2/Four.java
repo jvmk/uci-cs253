@@ -41,16 +41,6 @@ public class Four {
          * The words found in {@link #mData} after normalization.
          */
         Stream<String> mWords = Stream.empty();
-//        /**
-//         * Stream mapping each distinct word in {@link #mWords} to its number of occurrences in {@link #mWords}.
-//         */
-//        Stream<Pair<String, Integer>> mWordFreqs = Stream.empty();
-
-//        /**
-//         * Maps a word to its occurrence count.
-//         */
-//        Map<String, Integer> mWordFreqs = new HashMap<>();
-
         /**
          * List of {@link Pair}s that each map a distinct word in {@link #mWords} to its number of occurrences in
          * {@link #mWords}.
@@ -61,12 +51,14 @@ public class Four {
     public static void main(String[] args) throws IOException {
         SharedState state = new SharedState();
         state.mInputFilePath = args[0];
+
         readFile(state);
         filterCharsAndNormalize(state);
         scan(state);
         removeStopWords(state);
         frequencies(state);
         sort(state);
+
         for (int i = 0; i < 25; i++) {
             Pair<String, Integer> p = state.mWordFreqs.get(i);
             System.out.println(String.format("%s  -  %d", p.mItem1, p.mItem2));
@@ -173,17 +165,4 @@ public class Four {
             mItem2 = item2;
         }
     }
-
-//    /**
-//     * Updates {@code state.mWordFreqs} by incrementing the value associated with each key {@code k} by one for each
-//     * occurrence of {@code k} in {@code state.mWords} (or adds a new entry with a value of 1 when encountering an entry
-//     * in {@code state.mWords} that is not already a key in {@code state.mWordFreqs}).
-//     * @param state The shared state that is to be updated.
-//     */
-//    public static void frequencies(SharedState state) {
-//        // Count the number of occurrences by updating the frequency map.
-//        // Note: the merge call associates the entry with a value of 1 if the key is not found; otherwise the
-//        // current value is incremented by 1 (as newVal assumes a value of 1).
-//        state.mWords.forEach(word -> state.mWordFreqs.merge(word, 1, (oldVal, newVal) -> oldVal + newVal));
-//    }
 }
