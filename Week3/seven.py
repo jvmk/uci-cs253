@@ -8,36 +8,55 @@ RECURSION_LIMIT = 9500
 # depth of the call stack
 sys.setrecursionlimit(RECURSION_LIMIT+10)
 
-def count(word_list, stopwords, wordfreqs):
-    # What to do with an empty list
-    if word_list == []:
-        return
-    # The inductive case, what to do with a list of words
-    else:
-        # Process the head word
-        word = word_list[0]
-        if word not in stopwords:
-            if word in wordfreqs:
-                wordfreqs[word] += 1
-            else:
-                wordfreqs[word] = 1
-        # Process the tail 
-        count(word_list[1:], stopwords, wordfreqs)
+# Define the Y-combinator (immediately from https://github.com/crista/EPS-slides/blob/master/lambda.py)
+Y = (lambda h: lambda F: F(lambda x: h(h)(F)(x)))(lambda h: lambda F: F(lambda x: h(h)(F)(x)))
 
-def wf_print(wordfreq):
-    if wordfreq == []:
-        return
-    else:
-        (w, c) = wordfreq[0]
-        print w, '-', c
-        wf_print(wordfreq[1:])
+
+def count(word_list, stopwords, wordfreqs):
+    fixed_point = lambda f: lambda wl: lambda sws: lambda wfs: None if wl == [] else f(wl[1:])(sws)(wfs) if wfs.update({wl[0]: (wfs.get(wl[0], 0) + (1 if wl[0] not in sws else 0))}) is None else True
+    Y(fixed_point)(word_list)(stopwords)(wordfreqs)
+
+
+def wf_print_y(wordfreq):
+    Y(lambda f: lambda wfs: None if wfs == []
+      else f(wfs[1:]) if print(f"{wfs[0][0]}  -  {wfs[0][1]}") is None
+      else None)(wordfreq)
+
+
+# small test case
+# wf_print_y([('a', 1), ('b', 2), ('c', 3)])
 
 stop_words = set(open('../stop_words.txt').read().split(','))
 words = re.findall('[a-z]{2,}', open(sys.argv[1]).read().lower())
 word_freqs = {}
 # Theoretically, we would just call count(words, word_freqs)
 # Try doing that and see what happens.
+# count(words, stop_words, word_freqs)
+
 for i in range(0, len(words), RECURSION_LIMIT):
     count(words[i:i+RECURSION_LIMIT], stop_words, word_freqs)
 
-wf_print(sorted(word_freqs.iteritems(), key=operator.itemgetter(1), reverse=True)[:25])
+wf_print_y(sorted(word_freqs.items(), key=operator.itemgetter(1), reverse=True)[:25])
+
+
+
+# ======================================================================================================================
+# Original main below
+
+# stop_words = set(open('../stop_words.txt').read().split(','))
+# words = re.findall('[a-z]{2,}', open(sys.argv[1]).read().lower())
+# word_freqs = {}
+# # Theoretically, we would just call count(words, word_freqs)
+# # Try doing that and see what happens.
+# for i in range(0, len(words), RECURSION_LIMIT):
+#     count(words[i:i+RECURSION_LIMIT], stop_words, word_freqs)
+#
+# wf_print(sorted(word_freqs.iteritems(), key=operator.itemgetter(1), reverse=True)[:25])
+
+# ======================================================================================================================
+
+# ======================================================================================================================
+# finding "fixed point" of the function:
+# x such that x = f(x) <- fixed point of f
+# g such that g = f(g) for functionals (functions that take a function as argument)
+# ======================================================================================================================
