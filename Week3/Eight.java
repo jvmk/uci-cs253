@@ -183,7 +183,7 @@ public class Eight {
     }
 
     /**
-     * Casts a {@link BiConsumer} with a nested {@code BiConsumer } to a {@code BiConsumer<T, BiConsumer>}, i.e.,
+     * Casts a {@link BiConsumer} with a nested {@code BiConsumer} to a {@code BiConsumer<T, BiConsumer>}, i.e.,
      * converts the nested {@code BiConsumer} to its raw type.
      * @param f A {@code BiConsumer} that takes another {@code BiConsumer} as its second argument.
      * @param <T> The the type of the first argument of the outer {@code BiConsumer}.
