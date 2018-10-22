@@ -28,15 +28,16 @@ public class Eleven {
          * <p>
          * This method takes a class literal, which allows the caller to indicate that it expects the result of the
          * invocation of this method to be of a certain type. This allows implementations of this abstract method to
-         * cast the return type to the desired type internally, which results in cleaner client code.
+         * cast the return type to the desired type internally (without having to deal with compiler warnings), which
+         * results in cleaner client code.
          *
          * @param msg
-         *         The message to be delivered in the mailbox.
+         *         The message to be delivered in the letterbox.
          * @param expectedReturnType
          *         A class literal that the caller supplies to indicate the expected return type.
          * @param <T>
          *         The type of the result.
-         * @return The result of performing the operation identified by the name in
+         * @return The result of performing the operation identified by {@code msg[0]} cast to the type {@code T}.
          */
         <T> T receive(String[] msg, Class<T> expectedReturnType);
     }
