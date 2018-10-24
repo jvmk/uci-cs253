@@ -152,16 +152,20 @@ public class Twelve {
         }
 
         // EXERCISE 12.2: "Dynamically" add new function to WORD_FREQS_OBJ that prints the top25 words.
-        // Note: can't use "me" here as we are not working within the class' own scope.
-        WORD_FREQS_OBJ.put(StringConstants.TOP25, (Runnable) () -> {
+        // Note: can't use the alias we created for "me" here as we are not working within the class' own scope.
+        // As a result, we can only achieve the "me" functionality here by making the function accept an argument that
+        // is the object instance on which it is to be invoked, just like how Python implements instance methods by
+        // considering the first argument as the object on which the method is to be invoked (hence that argument is
+        // named self by convention).
+        WORD_FREQS_OBJ.put(StringConstants.TOP25, (Consumer<Map<String, Object>>) (me) -> {
             // Get and invoke the sorted function, then create a view of the 25 first entries.
-            List<Pair<String, Integer>> top25 = ((Supplier<List<Pair<String, Integer>>>) WORD_FREQS_OBJ.get(StringConstants.SORTED)).get().subList(0, 25);
+            List<Pair<String, Integer>> top25 = ((Supplier<List<Pair<String, Integer>>>) me.get(StringConstants.SORTED)).get().subList(0, 25);
             for (Pair<String, Integer> p : top25) {
                 System.out.println(String.format("%s  -  %d", p.first(), p.second()));
             }
         });
-        // Get and invoke the new function.
-        ((Runnable) WORD_FREQS_OBJ.get(StringConstants.TOP25)).run();
+        // Get and invoke the new function, passing in the object itself as the argument (the "me" parameter).
+        ((Consumer<Map<String, Object>>) WORD_FREQS_OBJ.get(StringConstants.TOP25)).accept(WORD_FREQS_OBJ);
     }
 
 }
