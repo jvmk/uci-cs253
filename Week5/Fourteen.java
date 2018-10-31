@@ -119,6 +119,7 @@ public class Fourteen {
             wff.registerLoadEventHandler(this::load);
         }
 
+        @SuppressWarnings("Duplicates") // ignore duplicated in other files in project (solutions to other exercises)
         private void load(String ignoredFilepath) {
             // The stop_words.txt file path is hardcoded, so ignore argument (which is the filepath of the file for
             // which word frequencies are to be computed).
