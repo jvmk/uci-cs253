@@ -196,10 +196,14 @@ public class Fourteen {
         }
 
         /**
-         * Prints the contents of {@link #mZWords}, i.e., all non stop word words that contains the letter 'z'.
+         * Prints the number of unique non stop word words that contains the letter 'z'.
          */
         private void printZWords() {
-            mZWords.stream().sorted().forEach(s -> System.out.println(s));
+            // Print the number of unique words containing the letter 'z'.
+            // Note: Prof. Lopes said on canvas that it was up to me if I print the number of unique words containing
+            // the letter 'z', or the total number of words containing the letter 'z' (counting duplicates). I opted for
+            // the former.
+            System.out.println(mZWords.size());
         }
     }
 

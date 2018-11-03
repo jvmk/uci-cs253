@@ -279,12 +279,16 @@ public class Fifteen {
 
 
         /**
-         * Handler for 'print' events. In the context of this class, 'print' is interpreted as "print the words received
-         * through 'valid word' events that contain the letter 'z'".
+         * Handler for 'print' events. In the context of this class, 'print' is interpreted as "print the number of
+         * unique words received 'valid word' events that contain the letter 'z'".
          * @param event A 'print' event.
          */
         private void onPrintEvent(Event event) {
-            mZWords.stream().sorted().forEach(s -> System.out.println(s));
+            // Print the number of unique words containing the letter 'z'.
+            // Note: Prof. Lopes said on canvas that it was up to me if I print the number of unique words containing
+            // the letter 'z', or the total number of words containing the letter 'z' (counting duplicates). I opted for
+            // the former.
+            System.out.println(mZWords.size());
         }
 
     }
