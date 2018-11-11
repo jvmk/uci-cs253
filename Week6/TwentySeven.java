@@ -10,11 +10,11 @@ import java.util.stream.Stream;
 /**
  * Solution for exercises 27.1 and 27.2 in "Exercises in Programming Style" by Professor C. Lopes. Second part of the
  * homework of week 6 of UCI CS253 (Fall 2018 edition). In this style, we're to obey a "lazy rivers" programming style.
+ * This style is basically stream-based programming, so we can use Java's {@link Stream} API directly.
  *
  * @author Janus Varmarken {@literal <jvarmark@uci.edu>}
  */
 public class TwentySeven {
-
 
     public static void main(String[] args) throws IOException {
         java8StreamBasedSolution(args[0]);
@@ -38,8 +38,7 @@ public class TwentySeven {
                 map(line -> line.toLowerCase().replaceAll("[^a-zA-Z\\d\\s]", " ").split("\\s+")). // Normalize line to lower case and separate into words
                 flatMap(Arrays::stream). // Flatten from Stream<Sting[]> to Stream<String>
                 filter(word -> !stopWords.contains(word)). // Drop all words that are stop words.
-                // TODO need to limit size of stream?
-                collect(Collectors.toMap(w-> w, w -> 1, (current, one) -> current + one)). // Note: terminating operation, so no longer a stream. OK?
+                collect(Collectors.toMap(w-> w, w -> 1, (current, one) -> current + one)). // Note: terminating operation, so no longer a stream.
                 entrySet().stream().sorted((e1,e2) -> -e1.getValue().compareTo(e2.getValue())). // Sort in descending order. Note: intermediate stateful operation.
                 limit(25).forEach(e -> System.out.println(String.format("%s  -  %d", e.getKey(), e.getValue()))); // Print top 25 entries.
     }

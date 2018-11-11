@@ -30,6 +30,10 @@ public class TwentySix {
          */
         private Supplier<V> mFormula;
 
+        /**
+         * Creates a new column.
+         * @param formula The formula that generates (and updates) the list of cells in the created column.
+         */
         private Column(Supplier<V> formula) {
             mFormula = formula;
         }
@@ -163,9 +167,8 @@ public class TwentySix {
          * Call this every time the input changes, or periodically.
          */
         private void update() {
+            // Refresh the entire spreadsheet by reapplying the formulas that generate the column contents.
             for(Column<?> column : mAllColumns) {
-//                column.setCells(column.getFormula().get());
-                // TODO is this allowed according to style constraints? Or must we explicitly set the variable?
                 column.refresh();
             }
         }
