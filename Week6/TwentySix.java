@@ -38,15 +38,9 @@ public class TwentySix {
             return mCells;
         }
 
-        private void setCells(V cells) {
-            mCells = cells;
-        }
-
-        private Supplier<V> getFormula() {
-            return mFormula;
-        }
-
-        // TODO: is this ok?
+        /**
+         * Refreshes this column by reevaluating {@link #mFormula} and assigning its output to {@link #mCells}.
+         */
         private void refresh() {
             mCells = mFormula.get();
         }
@@ -150,7 +144,7 @@ public class TwentySix {
             return result;
         });
 
-        private final List<Column> mAllColumns = new ArrayList<>();
+        private final List<Column<?>> mAllColumns = new ArrayList<>();
 
         private final String mFilepath;
 
@@ -186,20 +180,3 @@ public class TwentySix {
     }
 
 }
-
-
-//        // First two columns are the input data, so they don't have any associated formula (hence Void for second
-//        // type parameter)
-//        final Pair<List<String>, Void> allWordsColumn = new Pair<>();
-//        final Pair<Set<String>, Void> stopWordsColumn = new Pair<>();
-//        final Pair<List<String>, Supplier<List<Optional<String>>>> nonStopWordsColumn = new Pair<>(null, () -> {
-//            // Hack: if we call .collect() directly on the stream resulting from the map call, we'll run into type
-//            // check issues (due to type erasure?), so use a local variable for the stream, then call collect on that.
-//            Stream<Optional<String>> s = allWordsColumn.first().stream().
-//                    map(word -> stopWordsColumn.first().contains(word) ? Optional.empty() : Optional.of(word));
-//            return s.collect(Collectors.toList());
-//        });
-//        final Pair<Set<String>, Supplier<Set<String>>> unqiueWords = new Pair<>(null, )
-
-
-

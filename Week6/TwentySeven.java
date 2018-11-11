@@ -21,9 +21,9 @@ public class TwentySeven {
     }
 
     /**
-     * Solution using Java's built in stream functionality.
+     * Solution using Java's built in {@link Stream} API.
      * @param filepath The path to the input file.
-     * @throws IOException
+     * @throws IOException if any error occurs while accessing the input file or the stop words file.
      */
     public static void java8StreamBasedSolution(String filepath) throws IOException {
         // Load stop words into a set.
