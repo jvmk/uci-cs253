@@ -15,22 +15,10 @@ import java.util.stream.Stream;
  */
 public class Eighteen {
 
-    /**
-     * Factory for creating {@code Eighteen} instances.
-     * Clients are only allowed to instantiate {@code Eighteen}s using this factory.
-     * The factory returns a proxy that forwards calls to a backing {@code Eighteen} instance.
-     * The proxy's interface is the same as {@code Eighteen}'s interface as it is a subclass of {@code Eighteen}.
-     * @param trackedMethods Methods of {@code Eighteen} which are to be tracked. Set to {@code null} or an empty array
-     *                       if you do not wish to track any methods.
-     * @return A proxy that forwards all calls to a new {@code Eighteen} instance.
-     */
-    public static Eighteen newEighteen(Method[] trackedMethods) {
-        trackedMethods = trackedMethods == null ? new Method[0] : trackedMethods;
-        return new EighteenProxy(new Eighteen(), trackedMethods);
-    }
-
-    private Eighteen() {
-        // Private to prevent client code from instantiating Eighteen directly; enforce proxy.
+    public Eighteen() {
+        // Constructor in the "original" code.
+        // Only included here for illustrative purposes (mimic how the code would look initially, i.e., before aspects).
+        // Code wishing to augment the original code should use the proxy.
     }
 
     @SuppressWarnings("Duplicates") // ignore duplicated in other files in project (solutions to other exercises)
@@ -90,7 +78,21 @@ public class Eighteen {
      * Since Java does not allow for runtime modifications to the symbol table, we must resort to a proxy design pattern
      * in order to achieve the goals of the exercise.
      */
-    private static class EighteenProxy extends Eighteen {
+    public static class EighteenProxy extends Eighteen {
+
+        /**
+         * Factory for creating {@code Eighteen} proxies.
+         * Clients wishing to profile {@code Eighteen} code should instantiate proxies using this factory.
+         * The factory returns a proxy that forwards calls to a backing {@code Eighteen} instance.
+         * The proxy's interface is the same as {@code Eighteen}'s interface as it is a subclass of {@code Eighteen}.
+         * @param trackedMethods Methods of {@code Eighteen} which are to be tracked. Set to {@code null} or an empty
+         *                       array if you do not wish to track any methods.
+         * @return A proxy that forwards all calls to a new {@code Eighteen} instance.
+         */
+        public static Eighteen newEighteenProxy(Method[] trackedMethods) {
+            trackedMethods = trackedMethods == null ? new Method[0] : trackedMethods;
+            return new EighteenProxy(new Eighteen(), trackedMethods);
+        }
 
         private final Eighteen mProxied;
         private final Method[] mTrackedMethods;
@@ -163,7 +165,7 @@ public class Eighteen {
                 Eighteen.class.getDeclaredMethod("sort", Map.class)
         };
         // Cannot overwrite symbol table, so must resort to proxy pattern.
-        Eighteen eighteen = Eighteen.newEighteen(trackedMethods);
+        Eighteen eighteen = EighteenProxy.newEighteenProxy(trackedMethods);
         List<Map.Entry<String, Integer>> wordFreqs =
                 eighteen.sort(eighteen.frequencies(eighteen.extractWords(args[0])));
         wordFreqs.stream().limit(25).
