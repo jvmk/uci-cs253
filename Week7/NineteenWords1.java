@@ -16,6 +16,7 @@ import java.util.stream.Stream;
  */
 public class NineteenWords1 implements Function<String, List<String>> {
 
+    @SuppressWarnings("Duplicates") // ignore duplicated in other files in project (solutions to other exercises)
     @Override
     public List<String> apply(String filepath) {
         // Load stop words and input file
