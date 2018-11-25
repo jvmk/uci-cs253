@@ -1,3 +1,6 @@
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -7,33 +10,40 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Solution for exercises 28.1 and 28.2 in "Exercises in Programming Style" by Professor C. Lopes. First part of the
- * homework of week 8 of UCI CS253 (Fall 2018 edition). In this style, we're to obey an "actors" programming style.
- * This style is basically concurrent message-passing.
+ * Solution for exercise 28.3 in "Exercises in Programming Style" by Professor C. Lopes. Second part of the homework of
+ * week 8 of UCI CS253 (Fall 2018 edition). In this exercise, we're to combine the "actors" programming style with the
+ * "lazy rivers" programming style.
  *
  * @author Janus Varmarken {@literal <jvarmark@uci.edu>}
  */
 @SuppressWarnings("Duplicates") // Suppress warnings for duplicated code from previous and later exercises.
-public class TwentyEight {
+public class TwentyEightThree {
 
     public static void main(String[] args) throws InterruptedException {
         WordExtractor wordExtractor = new WordExtractor();
         WordFilter wordFilter = new WordFilter();
         WordFrequencyTracker wordFreqTracker = new WordFrequencyTracker();
         Actor[] allActors = new Actor[] { wordExtractor, wordFilter, wordFreqTracker };
+
         // Start the threads.
         for (Actor a : allActors) {
             a.start();
         }
+
         // Send the init message to all actors.
         wordExtractor.acceptMessage(createInitMessage(args[0]));
         wordFilter.acceptMessage(createInitMessage());
         wordFreqTracker.acceptMessage(createInitMessage());
-        // Register for outbound messages.
+
+        // Register for outbound messages, forming a pipeline.
         wordExtractor.acceptMessage(createRegistrationMessage(wordFilter));
         wordFilter.acceptMessage(createRegistrationMessage(wordFreqTracker));
-        // Fire the processing chain by sending the process words message.
-        wordExtractor.acceptMessage(new StringMessage(StringConstants.PROCESS_WORDS));
+        // This registration is additional (when compared to 28.1 and 28.2) as we need to allow the end of the pipeline
+        // to send messages to the front of the pipeline in order for the end to initiate a pull (see lazy rivers).
+        wordFreqTracker.acceptMessage(createRegistrationMessage(wordExtractor));
+
+        // Initiate things by sending the print top 25 message.
+        wordFreqTracker.acceptMessage(new StringMessage(StringConstants.PRINT_TOP_25));
         // Wait for actors to terminate
         for (Actor a : allActors) {
             a.join();
@@ -199,62 +209,81 @@ public class TwentyEight {
      */
     private static class WordExtractor extends Actor {
 
-        private String mFileContents;
+        /**
+         * Reader that reads from the specified file.
+         */
+        private BufferedReader mReader;
+
+        /**
+         * Currently buffered words (originating from a single line read by {@link #mReader}).
+         */
+        private String[] mBufferedWords;
+
+        /**
+         * Next index to use when returning a word from {@link #mBufferedWords}.
+         */
+        private int mBufferedWordsIndex = 0;
 
         @Override
         protected void dispatch(Message<?> msg) {
             if (msg.getOperationId().equals(StringConstants.INIT) && msg instanceof StringMessage) {
-                this.init((StringMessage) msg);
-            } else if (msg.getOperationId().equals(StringConstants.PROCESS_WORDS)) {
-                // We don't care about the message type in this case as we do not expect
-                // the message to carry any arguments.
-                this.processWords();
+                this.handleInitMessage((StringMessage) msg);
+            } else if (msg.getOperationId().equals(StringConstants.NEXT_WORD)) {
+                // We don't care about the message type as we do not make use of the message's arguments.
+                this.handleNextWordMessage();
             } else {
-                // Message not understood, forward it.
-                forwardMessage(msg);
+                // Forward unknown messages of unknown types to later actors
+                this.forwardMessage(msg);
             }
         }
 
         /**
-         * Invoked upon reception of an init message. Loads the contents of the file at the path specified by the
-         * first argument in {@code msg} into a member field.
+         * Invoked upon reception of an init message. Initializes a {@link Stream} member field that contains each word
+         * of the file at the path specified by the first argument in {@code msg}.
          * @param msg The init message.
          */
-        private void init(StringMessage msg) {
+        private void handleInitMessage(StringMessage msg) {
             String filepath = msg.getArgs()[0];
-            try (Stream<String> lines = Files.lines(Paths.get(filepath))) {
-                // Normalize to lower case and convert all non-alphanumeric characters (except whitespace) to a space.
-                // Then join strings using the system's line separator in order to preserve line breaks in the single
-                // resulting string (Files.lines(Path) throws away line separators when reading the file).
-                mFileContents = lines.map(line -> line.toLowerCase().replaceAll("[^a-zA-Z\\d\\s]", " ")).
-                        collect(Collectors.joining(System.lineSeparator()));
-            } catch (IOException ioe) {
-                // Rethrow as unchecked (fail early + avoid try-catch in client code).
-                throw new RuntimeException(ioe);
+            try {
+                // Initialize the reader.
+                mReader = new BufferedReader(new FileReader(filepath));
+            } catch (FileNotFoundException e) {
+                // Rethrow as unchecked (fail early + avoid try-catch in caller)
+                throw new RuntimeException(e);
             }
         }
 
         /**
-         * Invoked upon reception of a "process words" message.
+         * Handler for {@link StringConstants#NEXT_WORD} messages.
          */
-        private void processWords() {
-            if (mFileContents == null) {
-                // Do nothing if init has not yet been called.
-                return;
-            }
-            String[] words = mFileContents.split("\\s+");
-            for (String w : words) {
-                // Inform all registered actors of the new word.
-                for (Actor a : mRecipients) {
-                    a.acceptMessage(new StringMessage(StringConstants.UNFILTERED_WORD, w));
+        private void handleNextWordMessage() {
+            try {
+                if (mBufferedWords != null && mBufferedWordsIndex < mBufferedWords.length) {
+                    // Return next buffered word if unprocessed words in buffer.
+                    String w = mBufferedWords[mBufferedWordsIndex++];
+                    mRecipients.forEach(r -> r.acceptMessage(new StringMessage(StringConstants.UNFILTERED_WORD, w)));
+                } else {
+                    // Otherwise read and buffer the next line.
+                    String line = mReader.readLine();
+                    if (line == null) {
+                        // Reached end of file, so send stream empty message.
+                        mRecipients.forEach(r -> r.acceptMessage(new StringMessage(StringConstants.STREAM_EMPTY)));
+                        // And close file stream
+                        mReader.close();
+                    } else {
+                        // Prepare word buffer
+                        mBufferedWords = line.toLowerCase().replaceAll("[^a-zA-Z\\d\\s]", " ").split("\\s+");
+                        mBufferedWordsIndex = 0;
+                        // Recurse in order to trigger sending of next word.
+                        handleNextWordMessage();
+                    }
                 }
+            } catch (IOException e) {
+                // Rethrow as unchecked (fail early + avoid try-catch in caller).
+                throw new RuntimeException(e);
             }
-            // Trigger printing by sending the print message. Note that the print message will be forwarded down the
-            // Actor chain until it reaches the WordFrequencyTracker.
-            mRecipients.stream().forEach(r -> r.acceptMessage(new StringMessage(StringConstants.PRINT_TOP_25)));
-            // Kill self and in turn (due to forwarding) all subsequent actors by sending a termination message to this.
-            this.acceptMessage(new StringMessage(StringConstants.TERMINATE));
         }
+
     }
 
     /**
@@ -262,22 +291,29 @@ public class TwentyEight {
      */
     private static class WordFilter extends Actor {
 
+        /**
+         * The stop words.
+         */
         private Set<String> mStopWords;
 
         @Override
         protected void dispatch(Message<?> msg) {
             if (msg.getOperationId().equals(StringConstants.INIT)) {
                 // We don't care about the message type as we do not make use of the message's arguments.
-                init();
+                handleInitMessage();
             } else if (msg.getOperationId().equals(StringConstants.UNFILTERED_WORD) && msg instanceof StringMessage) {
-                filterWord((StringMessage) msg);
+                handleUnfilteredWordMessage((StringMessage) msg);
             } else {
-                // Message not understood, forward it.
-                forwardMessage(msg);
+                // Forward unknown message types to later actors
+                this.forwardMessage(msg);
             }
         }
 
-        private void init() {
+        /**
+         * Handles {@link StringConstants#INIT} messages. Reads and parses the stop words file, putting its content
+         * in {@link #mStopWords}.
+         */
+        private void handleInitMessage() {
             try (Stream<String> swStream = Files.lines(Paths.get("../stop_words.txt"))) {
                 // Add single-char words to stop words stream, and collect stop words stream to set.
                 // Note: explicitly use HashSet for O(1) complexity contains().
@@ -285,17 +321,23 @@ public class TwentyEight {
                         Arrays.stream("a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z".split(","))).
                         collect(Collectors.toCollection(HashSet::new));
             } catch (IOException ioe) {
-                // Rethrow as unchecked (fail early + avoid try-catch in client code).
+                // Rethrow as unchecked (fail early + avoid try-catch in caller).
                 throw new RuntimeException(ioe);
             }
         }
 
-        private void filterWord(StringMessage msg) {
+        /**
+         * Handles {@link StringConstants#UNFILTERED_WORD} messages.
+         * @param msg A {@link StringConstants#UNFILTERED_WORD} message.
+         */
+        private void handleUnfilteredWordMessage(StringMessage msg) {
             for (String w : msg.getArgs()) {
                 if (!mStopWords.contains(w)) {
-                    for (Actor a : mRecipients) {
-                        a.acceptMessage(new StringMessage(StringConstants.FILTERED_WORD, w));
-                    }
+                    // Not a stop word, so forward a filtered words message.
+                    mRecipients.forEach(r -> r.acceptMessage(new StringMessage(StringConstants.FILTERED_WORD, w)));
+                } else {
+                    // A stop word. Forward message to later actors to allowed them a chance to request the next word.
+                    this.forwardMessage(msg);
                 }
             }
         }
@@ -319,25 +361,69 @@ public class TwentyEight {
                 // We don't care about the type of message as we do not make use of its arguments.
                 mWordFreqs = new HashMap<>();
             } else if (msg.getOperationId().equals(StringConstants.FILTERED_WORD) && msg instanceof StringMessage) {
-                incrementWordCount((StringMessage) msg);
+                this.handleFilteredWordMessage((StringMessage) msg);
             } else if (msg.getOperationId().equals(StringConstants.PRINT_TOP_25)) {
                 // We don't care about the type of message as we do not make use of its arguments.
-                printTop25();
+                this.handlePrintTop25Message();
+            } else if (msg.getOperationId().equals(StringConstants.UNFILTERED_WORD)) {
+                // We don't care about the type of message as we do not make use of its arguments.
+                this.handleUnfilteredWordMessage();
+            } else if (msg.getOperationId().equals(StringConstants.STREAM_EMPTY)) {
+                // We don't care about the type of message as we do not make use of its arguments.
+                this.handleStreamEmptyMessage();
             } else {
-                // Message not understood, forward it.
-                forwardMessage(msg);
+                // Forward unknown message types to later actors
+                this.forwardMessage(msg);
             }
         }
 
-        private void incrementWordCount(StringMessage msg) {
+        /**
+         * Handles {@link StringConstants#FILTERED_WORD} messages.
+         * @param msg A {@link StringConstants#FILTERED_WORD} message.
+         */
+        private void handleFilteredWordMessage(StringMessage msg) {
             for (String w : msg.getArgs()) {
+                // Update word count.
                 mWordFreqs.merge(w, 1, (current, one) -> current + one);
             }
+            // Request the next word
+            this.requestNextWord();
         }
 
-        private void printTop25() {
+        /**
+         * Handles {@link StringConstants#UNFILTERED_WORD} messages.
+         */
+        private void handleUnfilteredWordMessage() {
+            // Current word was a stop word, so ignore and request next word.
+            this.requestNextWord();
+        }
+
+        /**
+         * Handles {@link StringConstants#PRINT_TOP_25} messages.
+         */
+        private void handlePrintTop25Message() {
+            // As we are initiating things from the end of the pipeline in this style, what we need to do here is to
+            // pull the first word to set off the pipeline processing.
+            requestNextWord();
+        }
+
+        /**
+         * Handles {@link StringConstants#STREAM_EMPTY} messages.
+         */
+        private void handleStreamEmptyMessage() {
+            // We've cleaned out the data source, hence now ready to print the top 25 entries.
             mWordFreqs.entrySet().stream().sorted((e1,e2) -> -e1.getValue().compareTo(e2.getValue())).
                     limit(25).forEach(e -> System.out.println(String.format("%s  -  %d", e.getKey(), e.getValue())));
+            // Terminate the pipeline by sending termination message to self (and forward it to all Actors registered
+            // for outbound messages).
+            this.acceptMessage(new StringMessage(StringConstants.TERMINATE));
+        }
+
+        /**
+         * Requests the next word by sending a {@link StringConstants#NEXT_WORD} to all recipients.
+         */
+        private void requestNextWord() {
+            mRecipients.forEach(r -> r.acceptMessage(new StringMessage(StringConstants.NEXT_WORD)));
         }
 
     }
@@ -348,13 +434,13 @@ public class TwentyEight {
     private static class StringConstants {
         private static final String TERMINATE = "terminate";
         private static final String INIT = "init";
-        private static final String PROCESS_WORDS = "process_words";
+        private static final String NEXT_WORD = "next_word";
         private static final String REGISTER_FOR_UPDATES = "register_for_updates";
         private static final String UNFILTERED_WORD = "unfiltered_word";
         private static final String FILTERED_WORD = "filtered_word";
         private static final String RESET_COUNT = "reset_count";
         private static final String PRINT_TOP_25 = "print_top_25";
+        private static final String STREAM_EMPTY = "stream_empty";
     }
-
 
 }
